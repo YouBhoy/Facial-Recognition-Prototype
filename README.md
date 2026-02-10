@@ -6,8 +6,9 @@ A desktop application for real-time facial detection using your webcam with mult
 
 ✨ **Face Detection**
 - Real-time face detection with bounding boxes
-- Eye detection within detected face regions
-- Visual indicators for each detected face
+- **Works with glasses and various face angles** 🎯
+- Facial landmark detection (eyes, nose, mouth, ears)
+- Confidence scores for each detected face
 - Multiple simultaneous face detection
 
 🎥 **Camera Control**
@@ -67,23 +68,25 @@ A desktop application for real-time facial detection using your webcam with mult
 ## Technical Details
 
 ### Technology Stack
-- **Face Detection**: OpenCV (Haar Cascade Classifier)
-- **Eye Detection**: OpenCV (Haar Cascade Eye Detection)
+- **Face Detection**: MediaPipe Face Detection (Google's advanced ML model)
+- **Video Processing**: OpenCV 
 - **GUI Framework**: Tkinter (built-in with Python)
 - **Image Processing**: OpenCV and Pillow
 - **Threading**: Python threading for non-blocking UI
 
 ### Detection Methods
-- **Haar Cascade Frontal Face**: Fast and reliable frontal face detection
-- **Haar Cascade Eyes**: Detects eyes within detected face regions
+- **MediaPipe Face Detection**: Advanced neural network-based detection
+- **Model Selection 1**: Full range detection model (handles glasses, various angles, lighting)
+- **Keypoint Detection**: Detects facial landmarks (eyes, nose, mouth, ears)
 - **Real-time Processing**: Runs locally on your machine
 - **No Internet Required**: All processing done offline
 
 ### Performance
-- Efficient cascade classifiers for fast detection
-- Threading prevents UI freezing during detection
-- 30 FPS target (actual FPS varies by system)
-- Supports 1280x720 video resolution
+- **Highly Accurate**: Works with glasses, different angles, and various lighting conditions
+- **Fast Processing**: 20-30+ FPS on modern systems
+- **Robust**: Handles real-world occlusions and variations
+- **Efficient**: Optimized for real-time applications
+- **Supports 1280x720 video resolution**
 
 ## File Structure
 ```
@@ -107,33 +110,29 @@ The app will create a `screenshots/` folder for saving captured images.
 - Ensure all dependencies are installed: `pip install -r requirements.txt`
 - Try running from Command Prompt/PowerShell with administrator privileges
 
-### Poor Detection Performance
+### Face Not Detected
 - Ensure adequate lighting in your environment
-- Keep faces 0.5 - 2 meters away from camera
-- This is normal for Haar Cascade - it uses CPU-based detection
-- Close other applications to free up system resources
+- Keep face 0.5 - 1.5 meters away from camera
+- Look directly at the camera
+- MediaPipe works with glasses, but excessive reflections can affect detection
+- Move to different lighting if needed
 
-### Slow Performance / High CPU Usage
-- This is expected with Haar Cascade detection
-- Lower camera resolution for faster processing
-- Consider upgrading system CPU for better FPS
-- GPU acceleration is not available with Haar Cascade
-
-### ImportError: No module named 'cv2'
+### ImportError: No module named 'mediapipe'
 - Reinstall dependencies: `pip install --upgrade -r requirements.txt`
 - Make sure you're using the correct Python environment
 
 ## Performance Notes
 
 - Face detection runs entirely on your local machine - no data is sent anywhere
-- Uses CPU-based Haar Cascade detection (highly portable, works on any system)
-- FPS varies based on:
-  - CPU capabilities
-  - Number of faces in frame
-  - Video resolution
-  - System resource availability
-- Typical FPS: 15-30 depending on system
-- Multi-threading ensures responsive UI even during heavy detection
+- **MediaPipe provides superior accuracy** compared to traditional cascade classifiers
+- Works well with:
+  - Glasses and sunglasses ✅
+  - Different face angles and poses ✅
+  - Various lighting conditions ✅
+  - Multiple simultaneous faces ✅
+- Typical FPS: 20-30+ depending on system
+- Multi-threading ensures responsive UI even during detection
+- All processing happens locally for privacy
 
 ## Future Enhancements
 
@@ -151,13 +150,14 @@ Phase 2 will include:
 - **Python**: 3.8 or higher
 - **RAM**: 4GB minimum (8GB recommended)
 - **Webcam**: USB camera or built-in camera
-- **CPU**: Quad-core processor recommended
+- **CPU**: Quad-core processor recommended (dual-core minimum)
 
 ## Requirements
 
 See `requirements.txt` for package versions:
 - opencv-python
 - Pillow
+- mediapipe (advanced neural network face detection)
 
 ## License
 

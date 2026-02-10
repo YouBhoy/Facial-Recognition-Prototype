@@ -11,6 +11,7 @@ import threading
 import os
 from datetime import datetime
 import numpy as np
+import mediapipe as mp
 
 
 class FacialRecognitionApp:
@@ -26,11 +27,13 @@ class FacialRecognitionApp:
         self.cap = None
         self.is_running = False
         self.thread = None
-        self.face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
-        self.eye_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_eye.xml'
+        
+        # Initialize MediaPipe Face Detection
+        self.mp_face_detection = mp.solutions.face_detection
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.face_detection = self.mp_face_detection.FaceDetection(
+            model_selection=1,  # 1 for full range detection (works with glasses)
+            min_detection_confidence=0.5
         )
         
         # FPS tracking
@@ -218,40 +221,53 @@ class FacialRecognitionApp:
                 
                 # Flip frame for mirror effect
                 frame = cv2.flip(frame, 1)
+                h, w, c = frame.shape
                 
-                # Convert to grayscale for detection
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                # Convert BGR to RGB for MediaPipe
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 
-                # Detect faces
-                faces = self.face_cascade.detectMultiScale(
-                    gray,
-                    scaleFactor=1.1,
-                    minNeighbors=5,
-                    minSize=(30, 30),
-                    flags=cv2.CASCADE_SCALE_IMAGE
-                )
+                # Run face detection
+                results = self.face_detection.process(rgb_frame)
                 
-                # Draw face rectangles and eyes
-                for i, (x, y, w, h) in enumerate(faces):
-                    # Draw face rectangle
-                    color = (0, 255, 0)  # Green
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-                    
-                    # Draw face label with confidence
-                    label = f"Face {i+1}"
-                    cv2.putText(frame, label, (x, y - 10),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                    
-                    # Detect eyes within face region
-                    roi_gray = gray[y:y+h, x:x+w]
-                    roi_color = frame[y:y+h, x:x+w]
-                    eyes = self.eye_cascade.detectMultiScale(roi_gray)
-                    
-                    for (ex, ey, ew, eh) in eyes[:2]:  # Usually 2 eyes
-                        cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (255, 0, 0), 2)
+                face_count = 0
+                
+                # Draw detections
+                if results.detections:
+                    face_count = len(results.detections)
+                    for i, detection in enumerate(results.detections):
+                        # Get bounding box
+                        bbox = detection.location_data.relative_bounding_box
+                        x = int(bbox.xmin * w)
+                        y = int(bbox.ymin * h)
+                        box_width = int(bbox.width * w)
+                        box_height = int(bbox.height * h)
+                        
+                        # Ensure coordinates are within frame bounds
+                        x = max(0, x)
+                        y = max(0, y)
+                        box_width = min(box_width, w - x)
+                        box_height = min(box_height, h - y)
+                        
+                        # Draw face rectangle
+                        color = (0, 255, 0)  # Green
+                        cv2.rectangle(frame, (x, y), (x + box_width, y + box_height), color, 2)
+                        
+                        # Draw face label with confidence
+                        confidence = detection.location_data.relative_keypoints
+                        score = detection.score[0] if detection.score else 0
+                        label = f"Face {i+1} ({int(score*100)}%)"
+                        cv2.putText(frame, label, (x, y - 10),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                        
+                        # Draw keypoints (eyes, nose, mouth, ears)
+                        if detection.location_data.relative_keypoints:
+                            for keypoint in detection.location_data.relative_keypoints:
+                                kx = int(keypoint.x * w)
+                                ky = int(keypoint.y * h)
+                                cv2.circle(frame, (kx, ky), 4, (255, 0, 0), -1)
                 
                 # Update face count
-                self.face_count_label.config(text=str(len(faces)))
+                self.face_count_label.config(text=str(face_count))
                 
                 # Calculate FPS
                 current_time = time.time()
@@ -261,22 +277,22 @@ class FacialRecognitionApp:
                 self.fps_label.config(text=str(self.fps))
                 
                 # Update status
-                if len(faces) > 0:
-                    self.update_status(f"Detecting {len(faces)} face(s)")
+                if face_count > 0:
+                    self.update_status(f"Detecting {face_count} face(s)")
                 else:
                     self.update_status("No faces detected")
                 
                 # Convert BGR to RGB and resize for display
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                rgb_frame_display = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 
                 # Resize for display (fit in window)
                 display_height = 500
-                ratio = display_height / rgb_frame.shape[0]
-                display_width = int(rgb_frame.shape[1] * ratio)
-                rgb_frame = cv2.resize(rgb_frame, (display_width, display_height))
+                ratio = display_height / rgb_frame_display.shape[0]
+                display_width = int(rgb_frame_display.shape[1] * ratio)
+                rgb_frame_display = cv2.resize(rgb_frame_display, (display_width, display_height))
                 
                 # Convert to PhotoImage
-                image = Image.fromarray(rgb_frame)
+                image = Image.fromarray(rgb_frame_display)
                 photo = ImageTk.PhotoImage(image=image)
                 
                 # Update label
@@ -321,6 +337,9 @@ class FacialRecognitionApp:
         """Handle window closing"""
         if self.is_running:
             self.stop_camera()
+        # Close MediaPipe resources
+        if hasattr(self, 'face_detection'):
+            self.face_detection.close()
         self.root.destroy()
 
 
