@@ -11,12 +11,13 @@ import threading
 import os
 from datetime import datetime
 import numpy as np
+from deepface import DeepFace
 
 
 class FacialRecognitionApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Facial Recognition - Face Detection")
+        self.root.title("Facial Recognition - Face Detection + Emotion")
         self.root.geometry("1100x800")
         self.root.resizable(True, True)
         
@@ -27,9 +28,9 @@ class FacialRecognitionApp:
         self.is_running = False
         self.thread = None
         
-        # Load cascade classifiers
+        # Load cascade classifiers - use default for better accuracy with glasses
         self.face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_alt2.xml'
+            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         )
         self.eye_cascade = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_eye_tree_eyeglasses.xml'
@@ -39,6 +40,12 @@ class FacialRecognitionApp:
         self.fps = 0
         self.frame_count = 0
         self.prev_time = 0
+
+        # Emotion detection
+        self.emotion_every_n_frames = 5
+        self.emotion_frame_counter = 0
+        self.emotion_confidence_threshold = 0.3
+        self.latest_emotions = []
         
         # Setup GUI
         self.setup_ui()
@@ -55,7 +62,7 @@ class FacialRecognitionApp:
                                 font=("Arial", 20, "bold"))
         title_label.grid(row=0, column=0, columnspan=3, pady=10)
         
-        subtitle_label = ttk.Label(main_frame, text="Face Detection", 
+        subtitle_label = ttk.Label(main_frame, text="Face Detection + Emotion", 
                                    font=("Arial", 12))
         subtitle_label.grid(row=1, column=0, columnspan=3, pady=(0, 15))
         
@@ -167,6 +174,7 @@ class FacialRecognitionApp:
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
             self.cap.set(cv2.CAP_PROP_FPS, 30)
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer for lower latency
             
             self.is_running = True
             self.start_btn.config(state=tk.DISABLED)
@@ -224,19 +232,20 @@ class FacialRecognitionApp:
                 # Convert to grayscale for detection
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 
-                # Apply histogram equalization for better contrast
-                gray = cv2.equalizeHist(gray)
-                
-                # Detect faces using different cascade options for better detection with glasses
+                # Detect faces with optimized parameters for speed
                 faces = self.face_cascade.detectMultiScale(
                     gray,
-                    scaleFactor=1.05,
-                    minNeighbors=4,
-                    minSize=(30, 30),
-                    maxSize=(500, 500),
+                    scaleFactor=1.1,   # Smaller steps for better accuracy
+                    minNeighbors=4,     # Lower threshold for glasses
+                    minSize=(40, 40),   # Detect smaller faces
                     flags=cv2.CASCADE_SCALE_IMAGE
                 )
                 
+                self.emotion_frame_counter += 1
+                run_emotion = (self.emotion_frame_counter % self.emotion_every_n_frames == 0)
+                if run_emotion:
+                    self.latest_emotions = []
+
                 # Draw face rectangles and eyes
                 for i, (x, y, w, h) in enumerate(faces):
                     # Draw face rectangle
@@ -247,11 +256,30 @@ class FacialRecognitionApp:
                     label = f"Face {i+1}"
                     cv2.putText(frame, label, (x, y - 10),
                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+                    emotion_label = None
+                    if run_emotion:
+                        emotion_label = self.detect_emotion_for_face(frame, x, y, w, h)
+                        self.latest_emotions.append(emotion_label)
+                    elif i < len(self.latest_emotions):
+                        emotion_label = self.latest_emotions[i]
+
+                    if emotion_label:
+                        text_y = y + h + 22
+                        if text_y > frame.shape[0] - 10:
+                            text_y = max(y - 10, 10)
+                        cv2.putText(frame, emotion_label, (x, text_y),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
                     
                     # Detect eyes within face region (works with glasses)
                     roi_gray = gray[y:y+h, x:x+w]
                     roi_color = frame[y:y+h, x:x+w]
-                    eyes = self.eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=5)
+                    eyes = self.eye_cascade.detectMultiScale(
+                        roi_gray, 
+                        scaleFactor=1.2, 
+                        minNeighbors=8,  # Higher to reduce false positives
+                        minSize=(20, 20)
+                    )
                     
                     for (ex, ey, ew, eh) in eyes[:2]:  # Usually 2 eyes
                         cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (255, 0, 0), 2)
@@ -268,7 +296,7 @@ class FacialRecognitionApp:
                 
                 # Update status
                 if len(faces) > 0:
-                    self.update_status(f"Detecting {len(faces)} face(s)")
+                    self.update_status(f"Detecting {len(faces)} face(s) with emotion")
                 else:
                     self.update_status("No faces detected")
                 
@@ -290,11 +318,30 @@ class FacialRecognitionApp:
                 self.video_label.image = photo
                 
                 # Small delay to prevent excessive CPU usage
-                time.sleep(0.01)
+                time.sleep(0.001)  # Minimal delay for better FPS
                 
             except Exception as e:
                 print(f"Error in detection loop: {e}")
                 break
+
+    def detect_emotion_for_face(self, frame, x, y, w, h):
+        """Detect emotion for a face crop and return a label string."""
+        face_bgr = frame[y:y + h, x:x + w]
+        if face_bgr.size == 0:
+            return None
+
+        try:
+            result = DeepFace.analyze(face_bgr, actions=['emotion'], enforce_detection=False)
+            if result and len(result) > 0:
+                emotions = result[0]['emotion']
+                dominant_emotion = result[0]['dominant_emotion']
+                confidence = emotions.get(dominant_emotion, 0)
+                if confidence < self.emotion_confidence_threshold:
+                    return f"Uncertain ({confidence:.2f})"
+                return f"{dominant_emotion} ({confidence:.2f})"
+        except Exception as e:
+            return None
+        return None
     
     def capture_screenshot(self):
         """Capture and save current frame"""

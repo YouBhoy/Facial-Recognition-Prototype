@@ -11,6 +11,11 @@ A desktop application for real-time facial detection using your webcam with mult
 - Confidence scores for each detected face
 - Multiple simultaneous face detection
 
+✨ **Emotion Recognition**
+- Real-time emotion labels per detected face
+- Confidence scores for detected emotions
+- Runs locally using a TensorFlow-based model
+
 🎥 **Camera Control**
 - Start/Stop camera with a single button click
 - Switch between multiple connected cameras via dropdown
@@ -68,16 +73,16 @@ A desktop application for real-time facial detection using your webcam with mult
 ## Technical Details
 
 ### Technology Stack
-- **Face Detection**: MediaPipe Face Detection (Google's advanced ML model)
+- **Face Detection**: OpenCV Haar Cascade
+- **Emotion Recognition**: DeepFace (TensorFlow)
 - **Video Processing**: OpenCV 
 - **GUI Framework**: Tkinter (built-in with Python)
 - **Image Processing**: OpenCV and Pillow
 - **Threading**: Python threading for non-blocking UI
 
 ### Detection Methods
-- **MediaPipe Face Detection**: Advanced neural network-based detection
-- **Model Selection 1**: Full range detection model (handles glasses, various angles, lighting)
-- **Keypoint Detection**: Detects facial landmarks (eyes, nose, mouth, ears)
+- **Haar Cascade Face Detection**: Fast classical detection for real-time use
+- **Eye Detection**: Uses OpenCV cascade tuned for glasses
 - **Real-time Processing**: Runs locally on your machine
 - **No Internet Required**: All processing done offline
 
@@ -137,7 +142,6 @@ The app will create a `screenshots/` folder for saving captured images.
 ## Future Enhancements
 
 Phase 2 will include:
-- Emotion recognition (happy, sad, angry, surprised, etc.)
 - Face recognition and identification
 - Performance improvements with deep learning models
 - Recording capabilities
@@ -157,7 +161,7 @@ Phase 2 will include:
 See `requirements.txt` for package versions:
 - opencv-python
 - Pillow
-- mediapipe (advanced neural network face detection)
+- deepface (CNN-based emotion recognition)
 
 ## License
 
