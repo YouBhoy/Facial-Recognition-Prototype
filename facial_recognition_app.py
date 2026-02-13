@@ -9,15 +9,18 @@ from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 import threading
 import os
+import json
+import time
 from datetime import datetime
 import numpy as np
 from deepface import DeepFace
+from playsound import playsound
 
 
 class FacialRecognitionApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Facial Recognition - Face Detection + Emotion")
+        self.root.title("Facial Recognition - Valentine's Edition")
         self.root.geometry("1150x850")
         self.root.resizable(True, True)
         
@@ -46,10 +49,45 @@ class FacialRecognitionApp:
         self.emotion_frame_counter = 0
         self.emotion_confidence_threshold = 0.3
         self.latest_emotions = []
+
+        # Dataset capture
+        self.dataset_dir = "dataset"
+        self.capture_labels = [
+            "angry",
+            "disgust",
+            "fear",
+            "happy",
+            "sad",
+            "surprise",
+            "neutral"
+        ]
+        self.capture_label_var = tk.StringVar(value=self.capture_labels[0])
+        self.capture_enabled_var = tk.BooleanVar(value=False)
+        self.capture_every_n_frames = 5
+        self.capture_frame_counter = 0
+        self.capture_count = 0
+
+        # Custom emotion model
+        self.custom_model_path = os.path.join("models", "custom_emotion_model.keras")
+        self.custom_labels_path = os.path.join("models", "custom_emotion_labels.json")
+        self.use_custom_model_var = tk.BooleanVar(value=False)
+        self.custom_model = None
+        self.custom_labels = []
+        self.custom_input_size = 224
+
+        # Sound effects
+        self.sound_dir = "sounds"
+        self.sound_enabled_var = tk.BooleanVar(value=True)
+        self.sound_cooldown_seconds = 2.0
+        self.last_sound_emotion = None
+        self.last_sound_time = 0.0
+        self.sound_map = {}
         
         # Setup GUI
         self.setup_styles()
         self.setup_ui()
+        self.refresh_sound_mapping()
+        self.try_load_custom_model()
         self.detect_cameras()
         
     def setup_styles(self):
@@ -57,18 +95,18 @@ class FacialRecognitionApp:
         self.style = ttk.Style()
         self.style.theme_use('clam')
         
-        # Modern color palette
+        # Valentine's color palette
         self.colors = {
-            'bg': '#1e1e2e',           # Dark background
-            'surface': '#2a2a3e',      # Card/surface
-            'primary': '#6366f1',      # Primary blue
-            'primary_hover': '#4f46e5',
-            'success': '#10b981',      # Green
-            'success_hover': '#059669',
-            'danger': '#ef4444',       # Red
-            'danger_hover': '#dc2626',
-            'text': '#e5e7eb',         # Light text
-            'text_secondary': '#9ca3af'
+            'bg': '#fff1f2',           # Blush background
+            'surface': '#fff7f9',      # Soft card surface
+            'primary': '#e11d48',      # Rose
+            'primary_hover': '#be123c',
+            'success': '#f43f5e',      # Pink
+            'success_hover': '#e11d48',
+            'danger': '#db2777',       # Magenta
+            'danger_hover': '#be185d',
+            'text': '#4a1c2f',         # Deep rose text
+            'text_secondary': '#7c2d4a'
         }
         
         # Configure main window
@@ -142,14 +180,14 @@ class FacialRecognitionApp:
         
         # Title
         title_label = tk.Label(main_frame, 
-                              text="Facial Recognition App", 
+                      text="Facial Recognition App - Valentine's", 
                               font=("Segoe UI", 24, "bold"),
                               bg=self.colors['bg'],
                               fg=self.colors['text'])
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 5))
         
         subtitle_label = tk.Label(main_frame, 
-                                 text="Face Detection + Emotion Recognition", 
+                     text="Face Detection + Emotion Recognition", 
                                  font=("Segoe UI", 12),
                                  bg=self.colors['bg'],
                                  fg=self.colors['text_secondary'])
@@ -186,13 +224,66 @@ class FacialRecognitionApp:
                                      command=self.capture_screenshot, state=tk.DISABLED,
                                      style='Primary.TButton')
         self.capture_btn.pack(side=tk.LEFT)
+
+        # Dataset and model controls
+        dataset_frame = ttk.Frame(controls_frame, style='Main.TFrame')
+        dataset_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(12, 0))
+
+        ttk.Label(dataset_frame, text="Capture Label:", style='Modern.TLabel').grid(
+            row=0, column=0, sticky=tk.W, padx=(0, 10))
+        self.capture_label_combo = ttk.Combobox(
+            dataset_frame,
+            textvariable=self.capture_label_var,
+            values=self.capture_labels,
+            state="readonly",
+            width=18,
+            style='Modern.TCombobox'
+        )
+        self.capture_label_combo.grid(row=0, column=1, sticky=tk.W, padx=(0, 14))
+
+        self.capture_toggle = ttk.Checkbutton(
+            dataset_frame,
+            text="Capture Faces",
+            variable=self.capture_enabled_var,
+            onvalue=True,
+            offvalue=False
+        )
+        self.capture_toggle.grid(row=0, column=2, sticky=tk.W, padx=(0, 14))
+
+        self.use_custom_model_check = ttk.Checkbutton(
+            dataset_frame,
+            text="Use Custom Model",
+            variable=self.use_custom_model_var,
+            onvalue=True,
+            offvalue=False
+        )
+        self.use_custom_model_check.grid(row=0, column=3, sticky=tk.W)
+        self.use_custom_model_check.config(state=tk.DISABLED)
+
+        self.sound_toggle = ttk.Checkbutton(
+            dataset_frame,
+            text="Sounds On",
+            variable=self.sound_enabled_var,
+            onvalue=True,
+            offvalue=False
+        )
+        self.sound_toggle.grid(row=0, column=4, sticky=tk.W, padx=(14, 0))
+
+        self.custom_model_status_label = tk.Label(
+            dataset_frame,
+            text="Custom model: not loaded",
+            fg=self.colors['text_secondary'],
+            bg=self.colors['bg'],
+            font=("Segoe UI", 9)
+        )
+        self.custom_model_status_label.grid(row=1, column=0, columnspan=4, sticky=tk.W, pady=(6, 0))
         
         # Video Display Frame
         video_frame = ttk.LabelFrame(main_frame, text="Live Feed", 
                                     padding="10", style='Card.TLabelframe')
         video_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 15))
         
-        self.video_label = tk.Label(video_frame, background=self.colors['bg'], 
+        self.video_label = tk.Label(video_frame, background=self.colors['surface'], 
                                     borderwidth=0, highlightthickness=0)
         self.video_label.pack(fill=tk.BOTH, expand=True)
         
@@ -223,7 +314,7 @@ class FacialRecognitionApp:
         ttk.Label(info_frame, text="FPS:", style='Modern.TLabel').grid(
             row=0, column=4, sticky=tk.W, padx=(0, 8))
         self.fps_label = tk.Label(info_frame, text="0", 
-                                  fg='#a78bfa',  # Purple
+                      fg='#e11d48',
                                   bg=self.colors['surface'],
                                   font=("Segoe UI", 10, "bold"))
         self.fps_label.grid(row=0, column=5, sticky=tk.W)
@@ -326,8 +417,6 @@ class FacialRecognitionApp:
     
     def detection_loop(self):
         """Main detection loop running in separate thread"""
-        import time
-        
         while self.is_running:
             try:
                 ret, frame = self.cap.read()
@@ -355,6 +444,12 @@ class FacialRecognitionApp:
                 if run_emotion:
                     self.latest_emotions = []
 
+                self.capture_frame_counter += 1
+                run_capture = (
+                    self.capture_enabled_var.get()
+                    and (self.capture_frame_counter % self.capture_every_n_frames == 0)
+                )
+
                 # Draw face rectangles and eyes
                 for i, (x, y, w, h) in enumerate(faces):
                     # Draw face rectangle
@@ -379,6 +474,12 @@ class FacialRecognitionApp:
                             text_y = max(y - 10, 10)
                         cv2.putText(frame, emotion_label, (x, text_y),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+                        if run_emotion and i == 0:
+                            self.maybe_play_sound(emotion_label)
+
+                    if run_capture:
+                        self.save_face_crop(frame, x, y, w, h)
                     
                     # Detect eyes within face region (works with glasses)
                     roi_gray = gray[y:y+h, x:x+w]
@@ -440,6 +541,14 @@ class FacialRecognitionApp:
             return None
 
         try:
+            if self.use_custom_model_var.get() and self.custom_model is not None:
+                label, confidence = self.predict_custom_emotion(face_bgr)
+                if label is None:
+                    return None
+                if confidence < self.emotion_confidence_threshold:
+                    return f"Uncertain ({confidence:.2f})"
+                return f"{label} ({confidence:.2f})"
+
             result = DeepFace.analyze(face_bgr, actions=['emotion'], enforce_detection=False)
             if result and len(result) > 0:
                 emotions = result[0]['emotion']
@@ -451,6 +560,144 @@ class FacialRecognitionApp:
         except Exception as e:
             return None
         return None
+
+    def save_face_crop(self, frame, x, y, w, h):
+        """Save a face crop for dataset capture."""
+        label = self.capture_label_var.get().strip()
+        if not label:
+            return
+
+        save_dir = os.path.join(self.dataset_dir, label)
+        os.makedirs(save_dir, exist_ok=True)
+
+        # Add a small margin around the face
+        margin = int(0.15 * max(w, h))
+        x1 = max(x - margin, 0)
+        y1 = max(y - margin, 0)
+        x2 = min(x + w + margin, frame.shape[1])
+        y2 = min(y + h + margin, frame.shape[0])
+
+        face_bgr = frame[y1:y2, x1:x2]
+        if face_bgr.size == 0:
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = os.path.join(save_dir, f"{label}_{timestamp}.jpg")
+        cv2.imwrite(filename, face_bgr)
+        self.capture_count += 1
+
+    def try_load_custom_model(self):
+        """Load a custom emotion model and labels if present."""
+        if not os.path.exists(self.custom_model_path) or not os.path.exists(self.custom_labels_path):
+            self.update_custom_model_ui(loaded=False)
+            return
+
+        try:
+            from tensorflow.keras.models import load_model
+
+            self.custom_model = load_model(self.custom_model_path)
+            with open(self.custom_labels_path, "r", encoding="utf-8") as handle:
+                self.custom_labels = json.load(handle)
+
+            if self.custom_model and self.custom_model.input_shape:
+                _, height, width, _ = self.custom_model.input_shape
+                if height and width:
+                    self.custom_input_size = int(height)
+
+            self.update_custom_model_ui(loaded=True)
+        except Exception:
+            self.custom_model = None
+            self.custom_labels = []
+            self.update_custom_model_ui(loaded=False)
+
+    def update_custom_model_ui(self, loaded):
+        """Update UI state for custom model availability."""
+        if loaded:
+            self.custom_model_status_label.config(text="Custom model: loaded")
+            self.use_custom_model_check.config(state=tk.NORMAL)
+        else:
+            self.custom_model_status_label.config(text="Custom model: not loaded")
+            self.use_custom_model_var.set(False)
+            self.use_custom_model_check.config(state=tk.DISABLED)
+
+    def predict_custom_emotion(self, face_bgr):
+        """Predict emotion using the custom model."""
+        if self.custom_model is None or not self.custom_labels:
+            return None, 0.0
+
+        face_rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
+        resized = cv2.resize(face_rgb, (self.custom_input_size, self.custom_input_size))
+        input_tensor = resized.astype("float32") / 255.0
+        input_tensor = np.expand_dims(input_tensor, axis=0)
+
+        preds = self.custom_model.predict(input_tensor, verbose=0)
+        if preds is None or len(preds) == 0:
+            return None, 0.0
+
+        idx = int(np.argmax(preds[0]))
+        confidence = float(preds[0][idx])
+        if idx < 0 or idx >= len(self.custom_labels):
+            return None, 0.0
+        return self.custom_labels[idx], confidence
+
+    def refresh_sound_mapping(self):
+        """Load sound files from the sounds folder."""
+        self.sound_map = {}
+        if not os.path.isdir(self.sound_dir):
+            return
+
+        for label in ["happy", "angry", "sad", "surprise"]:
+            path = self.find_sound_file(label)
+            if path:
+                self.sound_map[label] = path
+
+    def find_sound_file(self, label):
+        """Find a sound file for a label (wav or mp3)."""
+        for filename in os.listdir(self.sound_dir):
+            name, ext = os.path.splitext(filename)
+            if name.lower() == label.lower() and ext.lower() in {".wav", ".mp3"}:
+                return os.path.join(self.sound_dir, filename)
+        return None
+
+    def maybe_play_sound(self, emotion_label):
+        """Play a sound when the emotion changes."""
+        if not self.sound_enabled_var.get():
+            return
+
+        label = self.normalize_emotion_label(emotion_label)
+        if not label:
+            return
+
+        sound_path = self.sound_map.get(label)
+        if not sound_path:
+            return
+
+        now = time.time()
+        if label == self.last_sound_emotion:
+            return
+        if now - self.last_sound_time < self.sound_cooldown_seconds:
+            return
+
+        self.last_sound_emotion = label
+        self.last_sound_time = now
+
+        thread = threading.Thread(target=self.play_sound_file, args=(sound_path,), daemon=True)
+        thread.start()
+
+    def normalize_emotion_label(self, emotion_label):
+        """Normalize label text like 'happy (0.83)' to 'happy'."""
+        if not emotion_label:
+            return None
+        if emotion_label.lower().startswith("uncertain"):
+            return None
+        return emotion_label.split(" ")[0].strip().lower()
+
+    def play_sound_file(self, sound_path):
+        """Play a sound file without blocking the UI."""
+        try:
+            playsound(sound_path)
+        except Exception:
+            pass
     
     def capture_screenshot(self):
         """Capture and save current frame"""

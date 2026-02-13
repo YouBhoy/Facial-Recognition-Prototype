@@ -3,3 +3,5 @@ opencv-python>=4.10.0
 Pillow>=10.0.0
 deepface>=0.0.75
 fer>=22.5.1
+tensorflow>=2.10
+playsound==1.2.2

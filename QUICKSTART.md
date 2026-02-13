@@ -32,6 +32,29 @@ pip install -r requirements.txt
 
 Screenshots are automatically saved in a `screenshots` folder in the project directory.
 
+## Custom Emotion Model (Optional)
+
+### Capture a Dataset
+1. Start the camera
+2. Select a **Capture Label**
+3. Toggle **Capture Faces** to save face crops into `dataset/<label>/`
+4. Repeat for each emotion label with varied lighting and angles
+
+### Train the Model
+```bash
+python train_emotion_model.py --epochs 10
+```
+
+### Use the Custom Model
+Restart the app and enable **Use Custom Model** if it shows as loaded.
+
+## Emotion Sound Effects
+
+1. Create a `sounds` folder (already present if you added it).
+2. Add `.wav` or `.mp3` files named by emotion:
+   - `happy.wav`, `angry.wav`, `sad.wav`, `surprise.wav`
+3. Start the app and enable **Sounds On**.
+
 ## Troubleshooting
 
 ### "Python is not recognized"

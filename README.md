@@ -70,6 +70,56 @@ A desktop application for real-time facial detection using your webcam with mult
      - Frames per second (FPS)
      - All screenshots saved in the "screenshots" folder
 
+## Custom Emotion Model (Dataset + Training)
+
+You can capture your own labeled face images and train a custom emotion model.
+
+### 1) Capture Dataset
+
+1. Start the app and camera
+2. Choose a label from **Capture Label**
+3. Toggle **Capture Faces** to start saving face crops
+4. Repeat for each emotion label (more variety = better results)
+
+Captured images are saved to:
+```
+dataset/<label>/
+```
+
+### 2) Train the Model
+
+Run the training script from the project folder:
+```bash
+python train_emotion_model.py --epochs 10
+```
+
+This will save:
+```
+models/custom_emotion_model.keras
+models/custom_emotion_labels.json
+```
+
+### 3) Use the Custom Model
+
+Restart the app. If the model is found, you can enable **Use Custom Model**.
+
+## Emotion Sound Effects
+
+Add sound files to the `sounds` folder to play when an emotion is detected.
+
+### Supported Format
+- Use `.wav` or `.mp3` files (MP4 is not supported)
+
+### File Names
+Match the emotion labels exactly (case-insensitive):
+- `happy.wav` / `happy.mp3`
+- `angry.wav` / `angry.mp3`
+- `sad.wav` / `sad.mp3`
+- `surprise.wav` / `surprise.mp3`
+
+### Use in App
+Enable **Sounds On** while the camera is running. Sounds trigger once when the emotion changes.
+
 ## Technical Details
 
 ### Technology Stack
@@ -162,6 +212,7 @@ See `requirements.txt` for package versions:
 - opencv-python
 - Pillow
 - deepface (CNN-based emotion recognition)
+- tensorflow (for training custom models)
 
 ## License
 
