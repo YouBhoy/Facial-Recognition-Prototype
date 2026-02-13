@@ -18,7 +18,7 @@ class FacialRecognitionApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Facial Recognition - Face Detection + Emotion")
-        self.root.geometry("1100x800")
+        self.root.geometry("1150x850")
         self.root.resizable(True, True)
         
         # Variables
@@ -48,82 +48,191 @@ class FacialRecognitionApp:
         self.latest_emotions = []
         
         # Setup GUI
+        self.setup_styles()
         self.setup_ui()
         self.detect_cameras()
+        
+    def setup_styles(self):
+        """Setup modern UI styles"""
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        
+        # Modern color palette
+        self.colors = {
+            'bg': '#1e1e2e',           # Dark background
+            'surface': '#2a2a3e',      # Card/surface
+            'primary': '#6366f1',      # Primary blue
+            'primary_hover': '#4f46e5',
+            'success': '#10b981',      # Green
+            'success_hover': '#059669',
+            'danger': '#ef4444',       # Red
+            'danger_hover': '#dc2626',
+            'text': '#e5e7eb',         # Light text
+            'text_secondary': '#9ca3af'
+        }
+        
+        # Configure main window
+        self.root.configure(bg=self.colors['bg'])
+        
+        # Frame styles
+        self.style.configure('Main.TFrame', background=self.colors['bg'])
+        self.style.configure('Card.TLabelframe', 
+                           background=self.colors['surface'],
+                           foreground=self.colors['text'],
+                           borderwidth=0,
+                           relief='flat')
+        self.style.configure('Card.TLabelframe.Label',
+                           background=self.colors['surface'],
+                           foreground=self.colors['text'],
+                           font=('Segoe UI', 10, 'bold'))
+        
+        # Button styles
+        self.style.configure('Primary.TButton',
+                           background=self.colors['primary'],
+                           foreground='white',
+                           borderwidth=0,
+                           focuscolor='none',
+                           font=('Segoe UI', 10),
+                           padding=(20, 10))
+        self.style.map('Primary.TButton',
+                      background=[('active', self.colors['primary_hover']),
+                                ('pressed', self.colors['primary_hover'])])
+        
+        self.style.configure('Success.TButton',
+                           background=self.colors['success'],
+                           foreground='white',
+                           borderwidth=0,
+                           focuscolor='none',
+                           font=('Segoe UI', 10),
+                           padding=(20, 10))
+        self.style.map('Success.TButton',
+                      background=[('active', self.colors['success_hover']),
+                                ('pressed', self.colors['success_hover'])])
+        
+        self.style.configure('Danger.TButton',
+                           background=self.colors['danger'],
+                           foreground='white',
+                           borderwidth=0,
+                           focuscolor='none',
+                           font=('Segoe UI', 10),
+                           padding=(20, 10))
+        self.style.map('Danger.TButton',
+                      background=[('active', self.colors['danger_hover']),
+                                ('pressed', self.colors['danger_hover'])])
+        
+        # Combobox style
+        self.style.configure('Modern.TCombobox',
+                           fieldbackground=self.colors['surface'],
+                           background=self.colors['surface'],
+                           foreground=self.colors['text'],
+                           borderwidth=1,
+                           arrowcolor=self.colors['text'])
+        
+        # Label styles
+        self.style.configure('Modern.TLabel',
+                           background=self.colors['surface'],
+                           foreground=self.colors['text'],
+                           font=('Segoe UI', 10))
         
     def setup_ui(self):
         """Setup the user interface"""
         # Main frame
-        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame = ttk.Frame(self.root, padding="15", style='Main.TFrame')
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Title
-        title_label = ttk.Label(main_frame, text="Facial Recognition App", 
-                                font=("Arial", 20, "bold"))
-        title_label.grid(row=0, column=0, columnspan=3, pady=10)
+        title_label = tk.Label(main_frame, 
+                              text="Facial Recognition App", 
+                              font=("Segoe UI", 24, "bold"),
+                              bg=self.colors['bg'],
+                              fg=self.colors['text'])
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 5))
         
-        subtitle_label = ttk.Label(main_frame, text="Face Detection + Emotion", 
-                                   font=("Arial", 12))
-        subtitle_label.grid(row=1, column=0, columnspan=3, pady=(0, 15))
+        subtitle_label = tk.Label(main_frame, 
+                                 text="Face Detection + Emotion Recognition", 
+                                 font=("Segoe UI", 12),
+                                 bg=self.colors['bg'],
+                                 fg=self.colors['text_secondary'])
+        subtitle_label.grid(row=1, column=0, columnspan=3, pady=(0, 20))
         
         # Controls Frame
-        controls_frame = ttk.LabelFrame(main_frame, text="Camera Controls", padding="10")
-        controls_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        controls_frame = ttk.LabelFrame(main_frame, text="Camera Controls", 
+                                       padding="15", style='Card.TLabelframe')
+        controls_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
         
         # Camera Selection
-        ttk.Label(controls_frame, text="Select Camera:").grid(row=0, column=0, sticky=tk.W, padx=5)
+        ttk.Label(controls_frame, text="Select Camera:", style='Modern.TLabel').grid(
+            row=0, column=0, sticky=tk.W, padx=(0, 10), pady=(0, 15))
         self.camera_var = tk.StringVar()
         self.camera_combo = ttk.Combobox(controls_frame, textvariable=self.camera_var, 
-                                        state="readonly", width=40)
-        self.camera_combo.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), padx=5)
+                                        state="readonly", width=40, style='Modern.TCombobox')
+        self.camera_combo.grid(row=0, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 15))
         self.camera_combo.bind("<<ComboboxSelected>>", self.on_camera_selected)
         
         # Buttons Frame
-        buttons_frame = ttk.Frame(controls_frame)
-        buttons_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        buttons_frame = ttk.Frame(controls_frame, style='Main.TFrame')
+        buttons_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 0))
         
-        self.start_btn = ttk.Button(buttons_frame, text="Start Camera", command=self.start_camera)
-        self.start_btn.pack(side=tk.LEFT, padx=5)
+        self.start_btn = ttk.Button(buttons_frame, text="▶ Start Camera", 
+                                    command=self.start_camera, style='Success.TButton')
+        self.start_btn.pack(side=tk.LEFT, padx=(0, 10))
         
-        self.stop_btn = ttk.Button(buttons_frame, text="Stop Camera", command=self.stop_camera, state=tk.DISABLED)
-        self.stop_btn.pack(side=tk.LEFT, padx=5)
+        self.stop_btn = ttk.Button(buttons_frame, text="⬛ Stop Camera", 
+                                   command=self.stop_camera, state=tk.DISABLED, 
+                                   style='Danger.TButton')
+        self.stop_btn.pack(side=tk.LEFT, padx=(0, 10))
         
-        self.capture_btn = ttk.Button(buttons_frame, text="Capture Screenshot", command=self.capture_screenshot, state=tk.DISABLED)
-        self.capture_btn.pack(side=tk.LEFT, padx=5)
+        self.capture_btn = ttk.Button(buttons_frame, text="📸 Capture Screenshot", 
+                                     command=self.capture_screenshot, state=tk.DISABLED,
+                                     style='Primary.TButton')
+        self.capture_btn.pack(side=tk.LEFT)
         
         # Video Display Frame
-        video_frame = ttk.LabelFrame(main_frame, text="Video Feed", padding="5")
-        video_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
+        video_frame = ttk.LabelFrame(main_frame, text="Live Feed", 
+                                    padding="10", style='Card.TLabelframe')
+        video_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 15))
         
-        self.video_label = ttk.Label(video_frame, background="black")
+        self.video_label = tk.Label(video_frame, background=self.colors['bg'], 
+                                    borderwidth=0, highlightthickness=0)
         self.video_label.pack(fill=tk.BOTH, expand=True)
         
         # Info Frame
-        info_frame = ttk.LabelFrame(main_frame, text="Detection Status", padding="10")
-        info_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        info_frame = ttk.LabelFrame(main_frame, text="Detection Stats", 
+                                   padding="15", style='Card.TLabelframe')
+        info_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=0)
         
         # Status
-        ttk.Label(info_frame, text="Status:").grid(row=0, column=0, sticky=tk.W, padx=5)
-        self.status_label = ttk.Label(info_frame, text="Ready", foreground="green", font=("Arial", 10, "bold"))
-        self.status_label.grid(row=0, column=1, sticky=tk.W, padx=5)
+        ttk.Label(info_frame, text="Status:", style='Modern.TLabel').grid(
+            row=0, column=0, sticky=tk.W, padx=(0, 8))
+        self.status_label = tk.Label(info_frame, text="Ready", 
+                                     fg=self.colors['success'], 
+                                     bg=self.colors['surface'],
+                                     font=("Segoe UI", 10, "bold"))
+        self.status_label.grid(row=0, column=1, sticky=tk.W, padx=(0, 25))
         
         # Face Count
-        ttk.Label(info_frame, text="Faces Detected:").grid(row=0, column=2, sticky=tk.W, padx=5)
-        self.face_count_label = ttk.Label(info_frame, text="0", foreground="blue", font=("Arial", 10, "bold"))
-        self.face_count_label.grid(row=0, column=3, sticky=tk.W, padx=5)
+        ttk.Label(info_frame, text="Faces:", style='Modern.TLabel').grid(
+            row=0, column=2, sticky=tk.W, padx=(0, 8))
+        self.face_count_label = tk.Label(info_frame, text="0", 
+                                         fg=self.colors['primary'], 
+                                         bg=self.colors['surface'],
+                                         font=("Segoe UI", 10, "bold"))
+        self.face_count_label.grid(row=0, column=3, sticky=tk.W, padx=(0, 25))
         
         # FPS
-        ttk.Label(info_frame, text="FPS:").grid(row=0, column=4, sticky=tk.W, padx=5)
-        self.fps_label = ttk.Label(info_frame, text="0", foreground="purple", font=("Arial", 10, "bold"))
-        self.fps_label.grid(row=0, column=5, sticky=tk.W, padx=5)
+        ttk.Label(info_frame, text="FPS:", style='Modern.TLabel').grid(
+            row=0, column=4, sticky=tk.W, padx=(0, 8))
+        self.fps_label = tk.Label(info_frame, text="0", 
+                                  fg='#a78bfa',  # Purple
+                                  bg=self.colors['surface'],
+                                  font=("Segoe UI", 10, "bold"))
+        self.fps_label.grid(row=0, column=5, sticky=tk.W)
         
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(3, weight=1)
-        video_frame.columnconfigure(0, weight=1)
-        video_frame.rowconfigure(0, weight=1)
         controls_frame.columnconfigure(1, weight=1)
         info_frame.columnconfigure(1, weight=1)
         
